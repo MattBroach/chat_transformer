@@ -1,14 +1,17 @@
 import json
 import logging
+import asyncio
+from collections import Iterable
 
-from pythonosc.udp_client import SimpleUDPClient
+from pythonosc.osc_message_builder import OscMessageBuilder
 
 from .targets import InvalidActionError, OSCTarget
+from .protocol import OSCProtocol
 
 logger = logging.getLogger(__name__)
 
 
-class IRC_2_OSC_Client:
+class Irc2OscClient:
     """
     Takes data from an IRC server, parses it, and passes the appropriate data
     to OSC
@@ -17,25 +20,49 @@ class IRC_2_OSC_Client:
         self,
         osc_port,
         osc_ip='127.0.0.1',
-        commands_file="commands.json"
-        irc_channel=""
+        targets_file="targets.json",
+        irc_channel="",
+        loop=None
     ):
-        self.port = port
-        self.ip = ip
+        self.osc_port = osc_port
+        self.osc_ip = osc_ip
 
-        self.osc_client = SimpleUDPClient(
-            self.ip, self.port
-        )
-
-        self.targets_file = commands_file
+        self.targets_file = targets_file
 
         self.irc_client = None
+
+        self.loop = loop if loop is not None else asyncio.get_event_loop()
+
+    def connect(self):
+        """
+        Creates both IRC and OSC connections
+        """
+        osc_connect = self.loop.create_datagram_endpoint(
+            lambda: OSCProtocol(), remote_addr=(self.osc_ip, self.osc_port)
+        )
+        self.osc_transport, _ = self.loop.run_until_complete(osc_connect)
+
+    def build_osc_message(self, address, value):
+        """
+        composes OSC message in proper format for sending
+        """
+        builder = OscMessageBuilder(address=address)
+        if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
+            values = [value]
+        else:
+            values = value
+        for val in values:
+            builder.add_arg(val)
+        msg = builder.build()
+
+        return msg.dgram
 
     def osc_send(self, address, value):
         """
         Sends message to set value via IRC
         """
-        self.osc_client.send_message(address, value)
+        msg = self.build_osc_message(address, value)
+        self.osc_transport.sendto(msg)
 
     def irc_send(self, message):
         """
@@ -43,7 +70,7 @@ class IRC_2_OSC_Client:
         """
         pass
 
-    def save_targets(self):
+    def load_targets(self):
         """
         load commands from file.  IRC commands should come in the form of:
 
@@ -68,18 +95,16 @@ class IRC_2_OSC_Client:
                 ...
             }
         """
-        targets_file = open(self.targets_file).read()
-        targets = json.loads(targets_file)
+        with open(self.targets_file) as targets_file:
+            targets = json.loads(targets_file.read())
 
         # Load "initial" value into "current" value
         self.targets = {
-            key: OSCTarget(
-                name=key,
-                irc_client=self.irc_client,
-                osc_client=self.osc_client,
+            key.lower(): OSCTarget(
+                name=key.lower(),
                 **value
             )
-            for key, value in commands
+            for key, value in targets.items()
         }
 
     def save_targets(self):
@@ -87,7 +112,7 @@ class IRC_2_OSC_Client:
         Write current commands (with current values) to file
         """
         with open(self.commands_file, 'w') as outfile:
-            json.dump(self.commands, outfile, indent=4)
+            json.dump(self.commands, outfile, indent=2)
 
     def parse_command(self, irc_command):
         """
@@ -95,23 +120,23 @@ class IRC_2_OSC_Client:
         send it to the appropriate OSCTarget for handling
         """
         tokens = irc_command.split(' ')
-        if tokens.length == 2:
+        if len(tokens) == 2:
             target, action = tokens
             value = None
-        elif tokens.length == 3:
+        elif len(tokens) == 3:
             target, action, value = tokens
         else:
             return
 
-        osc_target = self.targets.get(target, None)
+        osc_target = self.targets.get(target.lower(), None)
 
         if osc_target is not None:
             try:
                 response = osc_target.run_action(action, value)
             except InvalidActionError as error:
-                logger.error(str(error.exception))
-
-            self.handle_action_response(response)
+                logger.error(str(error))
+            else:
+                self.handle_action_response(response)
 
     def handle_action_response(self, response):
         """
@@ -122,3 +147,11 @@ class IRC_2_OSC_Client:
 
         if response.has_osc_update:
             self.osc_send(response.osc_address, response.osc_value)
+
+    def target_value(self, target):
+        """
+        Returns the current value of a given target.  Currently, mostly a convenience 
+        function for testing and debugging
+        """
+        target_data = self.targets.get(target, None)
+        return target_data.current if target_data is not None else None

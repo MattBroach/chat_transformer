@@ -1,0 +1,17 @@
+{
+  "volume": {
+    "address": "/audio/volume",
+    "min": 0.0,
+    "max": 1.0,
+    "initial": 0.5,
+    "delta": 0.05
+  },
+  "brightness": {
+    "address": "/video/bc/brightness",
+    "min": -100,
+    "max": 100,
+    "initial": 0,
+    "delta": 1,
+    "allowed_actions": ["INCREMENT", "DECREMENT"]
+  }
+}

@@ -53,6 +53,14 @@ class OSCTarget:
         """
         action = action.lower()
 
+        if value is not None:
+            try:
+                value = float(value)
+            except ValueError:
+                return ActionResponse(
+                    self.get_invalid_value_msg
+                )
+
         if action not in self.allowed_actions:
             raise InvalidActionError(
                 '"{}" is not a valid action for OSCTarget "{}"'.format(action, self.name)
@@ -141,4 +149,13 @@ class OSCTarget:
         """
         return "{} is out of bounds for {} (Min {}, Max {})".format(
            value, self.name.upper(), self.min, self.max
+        )
+
+    def get_invalid_value_msg(self, value):
+        """
+        Generates message stating value passed is not a valid value (usually because a float
+        was expected but not received)
+        """
+        return "{} is not a valid value for {}".format(
+            value, self.name.upper()
         )
