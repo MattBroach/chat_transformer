@@ -53,18 +53,18 @@ class OSCTarget:
         """
         action = action.lower()
 
+        if action not in self.allowed_actions:
+            raise InvalidActionError(
+                '"{}" is not a valid action for OSCTarget "{}"'.format(action, self.name)
+            )
+
         if value is not None:
             try:
                 value = float(value)
             except ValueError:
                 return ActionResponse(
-                    self.get_invalid_value_msg
+                    self.get_invalid_value_msg(value)
                 )
-
-        if action not in self.allowed_actions:
-            raise InvalidActionError(
-                '"{}" is not a valid action for OSCTarget "{}"'.format(action, self.name)
-            )
 
         action_func = getattr(
             self, 'run_{}'.format(action), lambda *args, **kwargs: None

@@ -1,5 +1,4 @@
 from unittest import TestCase
-from math import isclose
 
 from irc2osc.targets import OSCTarget, InvalidActionError
 
@@ -27,7 +26,7 @@ class OSCTargetTests(TestCase):
             target.run_action('set_to_zero')
 
         self.assertEqual(
-            str(error.exception), 
+            str(error.exception),
             '"set_to_zero" is not a valid action for OSCTarget "My Target"',
         )
 
@@ -240,3 +239,38 @@ class OSCTargetTests(TestCase):
             response.irc_message,
             '0.05 is out of bounds for MY TARGET (Min 0.1, Max 1.0)'
         )
+
+    def test_invalid_value(self):
+        """
+        If a non-floatable is passed to a `run_action`, it should send a `not valid value` error
+        """
+        target = OSCTarget(
+            name='My Target',
+            address='/osc/address',
+            initial=0.5,
+            min=0.1,
+            max=1.0,
+            delta=0.07,
+        )
+
+        response = target.run_action('set', 'bar')
+        self.assertEqual(response.irc_message, 'bar is not a valid value for MY TARGET')
+        self.assertIsNone(response.osc_value)
+        self.assertIsNone(response.osc_address)
+
+    def test_increment_extra_value(self):
+        """
+        Passing an extra value with increment into `run_action` should have no effect
+        """
+        target = OSCTarget(
+            name='My Target',
+            address='/osc/address',
+            initial=0.5,
+            min=0.1,
+            max=1.0,
+            delta=0.07,
+        )
+
+        response = target.run_action('increment', '.75')
+        self.assertAlmostEqual(response.osc_value, 0.57)
+        self.assertAlmostEqual(target.current, 0.57)
