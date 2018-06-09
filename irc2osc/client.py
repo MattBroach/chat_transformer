@@ -8,6 +8,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 
 from .targets import InvalidActionError, OSCTarget
 from .protocol import OSCProtocol
+from .watchers import FileWatcher
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +24,16 @@ class Irc2OscClient(AioSimpleIRCClient):
         irc_channel=None,
         osc_ip='127.0.0.1',
         targets_file="targets.json",
-        loop=None
+        watch_targets_file=False,
+        watch_file_interval=60,
+        loop=None,
     ):
         self.osc_port = osc_port
         self.osc_ip = osc_ip
 
         self.irc_channel = self.format_irc_channel(irc_channel) if irc_channel is not None else None
 
+        self.targets = {}
         self.targets_file = targets_file
         self.load_targets()
 
@@ -39,6 +43,12 @@ class Irc2OscClient(AioSimpleIRCClient):
         self.reactor = self.reactor_class(loop=self.loop)
         self.connection = self.reactor.server()
         self.reactor.add_global_handler("all_events", self._dispatcher, -10)
+
+        if watch_targets_file:
+            watcher = FileWatcher(
+                self.targets_file, self.load_targets, loop=self.loop, check_interval=watch_file_interval
+            )
+            watcher.start()
 
     def format_irc_channel(self, irc_channel):
         """
@@ -103,7 +113,7 @@ class Irc2OscClient(AioSimpleIRCClient):
         """
         load commands from file.  IRC commands should come in the form of:
 
-            !TARGET ACTION <VALUE>
+            TARGET ACTION <VALUE>
 
         JSON values should be of the form:
 
@@ -114,7 +124,6 @@ class Irc2OscClient(AioSimpleIRCClient):
                     "max": MAX_VALUE,
                     "delta": INCREMENT/DECREMENT_VALUE,
                     "initial": INITIAL_VALUE,
-                    "current": LAST_OBSERVED_VALUE,
                     "allowed_actions": [
                         "INCREMENT",
                         "DECREMENT",
@@ -131,6 +140,7 @@ class Irc2OscClient(AioSimpleIRCClient):
         self.targets = {
             key.lower(): OSCTarget(
                 name=key.lower(),
+                current=self.target_value(key.lower()),
                 **value
             )
             for key, value in targets.items()

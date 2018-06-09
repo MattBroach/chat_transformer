@@ -25,14 +25,14 @@ class CLI:
             '-i',
             '--osc-ip',
             dest='osc_ip',
-            help='IP Address of the OSC target to connect to. Default is 127.0.0.1.',
+            help='IP Address of the OSC target. Default is 127.0.0.1.',
             default=os.environ.get('IRC2OSC_OSC_IP', '127.0.0.1'),
         )
         self.parser.add_argument(
             '-p',
             '--osc-port',
             dest='osc_port',
-            help='Port of the OSC target to connect to. No default value.',
+            help='Port of the OSC target. No default value.',
             default=os.environ.get('IRC2OSC_OSC_PORT', None),
         )
         self.parser.add_argument(
@@ -50,7 +50,7 @@ class CLI:
             '-s',
             '--irc-server',
             dest='irc_server',
-            help='Server address of the IRC Server to connect to. No default value.',
+            help='Server address of the IRC Server. No default value.',
             default=os.environ.get('IRC2OSC_IRC_SERVER', None),
         )
         self.parser.add_argument(
@@ -95,7 +95,7 @@ class CLI:
             '--targets-file',
             dest='targets_file',
             help=(
-                'Location of the file that holds the IRC -> OSC commands mapping. '
+                'Path of the file that holds the IRC -> OSC commands mapping. '
                 'Default is `targets.json`.'
             ),
             default=os.environ.get('IRC2OSC_TARGETS_FILE', 'targets.json')
@@ -106,6 +106,24 @@ class CLI:
             type=int,
             help='How verbose to make the output. Default is 1 (INFO)',
             default=1,
+        )
+        self.parser.add_argument(
+            '-w',
+            '--watch-targets-file',
+            dest='watch_targets_file',
+            help=(
+                'Reload the Targets file when it has changed on disk. set to True to initiate '
+                'autoreload.  All other values (or no value) will be interpreted as False.'
+            ),
+            default=os.environ.get('IRC2OSC_WATCH_TARGETS_FILE', False)
+        )
+        self.parser.add_argument(
+            '--watch-file-interval',
+            dest='watch_file_interval',
+            help=(
+                'Time (in seconds) between checking for file changes.  Default is 60'
+            ),
+            default=os.environ.get('IRC2OSC_WATCH_FILE_INTERVAL', 60)
         )
 
     @classmethod
@@ -138,11 +156,15 @@ class CLI:
                 "Please add them via the command line or their respective env variables."
             )
 
+        watch_targets_file = args.watch_targets_file in ['true', 'True']
+
         client = Irc2OscClient(
             args.osc_port,
             irc_channel=args.irc_channel if args.irc_channel is not None else args.irc_nickname,
             osc_ip=args.osc_ip,
             targets_file=args.targets_file,
+            watch_targets_file=watch_targets_file,
+            watch_file_interval=args.watch_file_interval
         )
 
         client.connect(
