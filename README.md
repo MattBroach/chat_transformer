@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/MattBroach/irc2osc.svg?branch=master)](https://travis-ci.org/MattBroach/irc2osc)
+[![PyPI version](https://badge.fury.io/py/irc2osc.svg)](https://badge.fury.io/py/irc2osc)
+
 # IRC2OSC
 
 Translates incoming IRC messages to OSC messages.
