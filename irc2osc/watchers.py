@@ -13,7 +13,7 @@ class FileWatcher:
         self._last_modified = self.get_last_modified_time(filename)
         self.check_interval = check_interval
 
-        self.filename=filename
+        self.filename = filename
         self.change_func = change_func
 
         self.loop = loop if loop is not None else asyncio.get_event_loop()
@@ -23,7 +23,7 @@ class FileWatcher:
         Returns the last time the file was modified
         """
         return os.stat(filename).st_mtime
-       
+
     def check_watched_file(self):
         """
         Check if the watched file has changed.  If so, run function passed on
