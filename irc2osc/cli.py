@@ -164,7 +164,7 @@ class CLI:
             osc_ip=args.osc_ip,
             targets_file=args.targets_file,
             watch_targets_file=watch_targets_file,
-            watch_file_interval=args.watch_file_interval
+            watch_file_interval=float(args.watch_file_interval)
         )
 
         client.connect(
