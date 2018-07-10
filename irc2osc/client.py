@@ -148,7 +148,6 @@ class Irc2OscClient(AioSimpleIRCClient):
             for key, value in targets.items()
         }
 
-
     def osc_send_all(self):
         """
         Initializes the OSC target with all current/initial values

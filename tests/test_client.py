@@ -134,7 +134,7 @@ class Irc2OscClientTests(TestCase):
         client = Irc2OscClient(
             9876, targets_file=os.path.join(TEST_DIR, 'test_target_file.json'), loop=self.loop
         )
-        
+
         client.targets['brightness'] = MockTarget('/osc/brightness/', 1.0)
         client.targets['contrast'] = MockTarget('/osc/contrast/', 0.5, current=0.75)
         client.targets['hue'] = MockTarget('/osc/hue/', 0)
