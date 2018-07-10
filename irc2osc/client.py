@@ -72,6 +72,8 @@ class Irc2OscClient(AioSimpleIRCClient):
         )
         self.osc_transport, _ = self.loop.run_until_complete(osc_connect)
 
+        self.osc_send_all()
+
         super().connect(irc_server, irc_port, irc_nickname, *args, **kwargs)
 
     def on_welcome(self, connection, event):
@@ -145,6 +147,16 @@ class Irc2OscClient(AioSimpleIRCClient):
             )
             for key, value in targets.items()
         }
+
+
+    def osc_send_all(self):
+        """
+        Initializes the OSC target with all current/initial values
+        """
+        for target in self.targets.values():
+            self.osc_send(
+                target.address, target.current if target.current is not None else target.initial
+            )
 
     def save_targets(self):
         """

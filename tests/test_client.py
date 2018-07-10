@@ -1,11 +1,22 @@
 import os
 import asyncio
 from unittest import TestCase
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 
 from irc2osc.client import Irc2OscClient
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+class MockTarget:
+    """
+    used to inset mock OSCTarget data into `client.targets` without relying on
+    the actual OSCTarget class
+    """
+    def __init__(self, address, initial, current=None):
+        self.initial = initial
+        self.current = current
+        self.address = address
 
 
 class Irc2OscClientTests(TestCase):
@@ -113,3 +124,27 @@ class Irc2OscClientTests(TestCase):
         """
         self.client.on_welcome('', '')
         self.mock_transport.write.assert_called_with(b'JOIN #fake_irc_nick\r\n')
+
+    @patch('irc2osc.client.Irc2OscClient.osc_send')
+    def test_osc_send_all(self, mock_osc_send):
+        """
+        `osc_send_all` should send the current or initial value for all
+        extent targets
+        """
+        client = Irc2OscClient(
+            9876, targets_file=os.path.join(TEST_DIR, 'test_target_file.json'), loop=self.loop
+        )
+        
+        client.targets['brightness'] = MockTarget('/osc/brightness/', 1.0)
+        client.targets['contrast'] = MockTarget('/osc/contrast/', 0.5, current=0.75)
+        client.targets['hue'] = MockTarget('/osc/hue/', 0)
+
+        client.osc_send_all()
+
+        expected = [
+            call('/osc/brightness/', 1.0),
+            call('/osc/contrast/', 0.75),
+            call('/osc/hue/', 0),
+        ]
+
+        mock_osc_send.assert_has_calls(expected, any_order=True)
