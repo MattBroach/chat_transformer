@@ -1,18 +1,18 @@
 import os
 from setuptools import setup, find_packages
 
-from irc2osc import __version__
+from chat_transformer import __version__
 
 readme = os.path.join(os.path.dirname(__file__), 'README.md')
 
 setup(
-    python_requires='>=3.5.2',
-    name='irc2osc',
+    python_requires='>=3.5.3',
+    name='chat_transformer',
     version=__version__,
-    url='https://github.com/MattBroach/irc2osc',
+    url='https://github.com/MattBroach/chat_transformer',
     author='Matt Nishi-Broach',
     author_email='go.for.dover@gmail.com',
-    description='Bridge that takes incoming IRC messages and converts them to OSC messages',
+    description='Bridge that takes incoming IRC messages and converts them to other formats',
     long_description=open(readme).read(),
     long_description_content_type='text/markdown',
     license='MIT',
@@ -28,7 +28,7 @@ setup(
         ]
     },
     entry_points={'console_scripts': [
-        'irc2osc = irc2osc.cli:CLI.entrypoint'
+        'chat_transformer = chat_transformer.cli:CLI.entrypoint'
     ]},
     classifiers=[
         'Environment :: Web Environment',

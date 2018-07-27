@@ -36,7 +36,7 @@ class Irc2OscClientTests(TestCase):
 
         # instantiate client
         self.client = Irc2OscClient(
-            9876, targets_file=os.path.join(TEST_DIR, 'test_target_file.json'), loop=self.loop
+            9876, commands_file=os.path.join(TEST_DIR, 'test_commands_file.json'), loop=self.loop
         )
         self.client.connect(
             'my.fake.irc.server',

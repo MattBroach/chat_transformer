@@ -1,52 +1,58 @@
 import json
 import logging
 import asyncio
-from collections import Iterable
+
 from irc.client_aio import AioSimpleIRCClient
 
-from pythonosc.osc_message_builder import OscMessageBuilder
-
-from .targets import InvalidActionError, OSCTarget
-from .protocol import OSCProtocol
+from .utils import class_from_string
+from .commands import InvalidActionError, Command
 from .watchers import FileWatcher
 
 logger = logging.getLogger(__name__)
 
 
-class Irc2OscClient(AioSimpleIRCClient):
+DEFAULT_OUTPUT_CLASSES = {
+    'osc': 'chat_transformer.outputs.osc.OSCOutput',
+    # 'http': 'chat_transformer.outputs.http.HTTP',
+}
+
+class TransformerClient(AioSimpleIRCClient):
     """
     Takes data from an IRC server, parses it, and passes the appropriate data
-    to OSC
+    the appropriate output(s), e.g. OSC, http, and/or back out to IRC
     """
     def __init__(
         self,
-        osc_port,
         irc_channel=None,
-        osc_ip='127.0.0.1',
-        targets_file="targets.json",
-        watch_targets_file=False,
+        commands_file="targets.json",
+        watch_commands_file=False,
         watch_file_interval=60,
         loop=None,
+        output_data={},
     ):
-        self.osc_port = osc_port
-        self.osc_ip = osc_ip
-
         self.irc_channel = self.format_irc_channel(irc_channel) if irc_channel is not None else None
 
-        self.targets = {}
-        self.targets_file = targets_file
-        self.load_targets()
+        self.commands = {}
+        self.commands_file = commands_file
+        self.load_commands()
 
         self.loop = loop if loop is not None else asyncio.get_event_loop()
+
+        # Initialize outputs
+        self.outputs = {}
+        for key, value in output_data.items():
+            output_cls_str = value.pop('class', DEFAULT_OUTPUT_CLASSES[key])
+            output_cls = class_from_string(output_cls_str)
+            self.outputs[key] = output_cls(**value)
 
         # Init from AioSimpleIRRCClient, but passing the event loop
         self.reactor = self.reactor_class(loop=self.loop)
         self.connection = self.reactor.server()
         self.reactor.add_global_handler("all_events", self._dispatcher, -10)
 
-        if watch_targets_file:
+        if watch_commands_file:
             watcher = FileWatcher(
-                self.targets_file, self.load_targets, loop=self.loop, check_interval=watch_file_interval
+                self.commands_file, self.load_commands, loop=self.loop, check_interval=watch_file_interval
             )
             watcher.start()
 
@@ -66,13 +72,11 @@ class Irc2OscClient(AioSimpleIRCClient):
 
         if self.irc_channel is None:
             self.irc_channel = self.format_irc_channel(self.irc_nickname)
+        
+        for output in self.outputs.values():
+            output.connect()
 
-        osc_connect = self.loop.create_datagram_endpoint(
-            lambda: OSCProtocol(), remote_addr=(self.osc_ip, self.osc_port)
-        )
-        self.osc_transport, _ = self.loop.run_until_complete(osc_connect)
-
-        self.osc_send_all()
+        self.send_all()
 
         super().connect(irc_server, irc_port, irc_nickname, *args, **kwargs)
 
@@ -83,86 +87,61 @@ class Irc2OscClient(AioSimpleIRCClient):
         """
         self.connection.join(self.irc_channel)
 
-    def build_osc_message(self, address, value):
-        """
-        composes OSC message in proper format for sending
-        """
-        builder = OscMessageBuilder(address=address)
-        if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
-            values = [value]
-        else:
-            values = value
-        for val in values:
-            builder.add_arg(val)
-        msg = builder.build()
-
-        return msg.dgram
-
-    def osc_send(self, address, value):
-        """
-        Sends message to set value via IRC
-        """
-        msg = self.build_osc_message(address, value)
-        self.osc_transport.sendto(msg)
-
     def irc_send(self, message):
         """
         Sends message to the joined IRC channel
         """
         self.connection.privmsg(self.irc_channel, message)
 
-    def load_targets(self):
+    def load_commands(self):
         """
         load commands from file.  IRC commands should come in the form of:
 
-            TARGET ACTION <VALUE>
+            COMMAND ACTION <VALUE>
 
         JSON values should be of the form:
 
             {
-                "TARGET": {
-                    "address": "/OSC/ADDRESS",
+                "COMMAND": {
                     "min": MIN_VALUE,
                     "max": MAX_VALUE,
                     "delta": INCREMENT/DECREMENT_VALUE,
                     "initial": INITIAL_VALUE,
-                    "allowed_actions": [
-                        "INCREMENT",
-                        "DECREMENT",
-                        "SET",
-                    ],
+                    "type": "NUMBER" (or "BOOLEAN", "MESSAGE"), 
+                    "outputs": {
+                        "osc": { "address": "/OSC/ADDRESS" },
+                        "http": { "endpoint": "/HTTP/ENDPOINT" },
+                        ...
+                    }
                 },
                 ...
             }
         """
-        with open(self.targets_file) as targets_file:
-            targets = json.loads(targets_file.read())
+        with open(self.commands_file) as commands_file:
+            commands = json.loads(commands_file.read())
 
         # Load "initial" value into "current" value
-        self.targets = {
-            key.lower(): OSCTarget(
+        self.commands = {
+            key.lower(): Command(
                 name=key.lower(),
-                current=self.target_value(key.lower()),
+                current=self.command_value(key.lower()),
                 **value
             )
-            for key, value in targets.items()
+            for key, value in commands.items()
         }
 
-    def osc_send_all(self):
+    def send_all(self):
         """
-        Initializes the OSC target with all current/initial values
+        Initializes the OSC command with all current/initial values
         """
-        for target in self.targets.values():
-            self.osc_send(
-                target.address, target.current if target.current is not None else target.initial
-            )
+        for command in self.commands.values():
+            value = command.current if command.current is not None else command.initial
 
-    def save_targets(self):
-        """
-        Write current commands (with current values) to file
-        """
-        with open(self.commands_file, 'w') as outfile:
-            json.dump(self.commands, outfile, indent=2)
+            for output_name, output in self.outputs.items():
+                output.send(
+                    value,
+                    **command.outputs[output_name], 
+                )
 
     def on_privmsg(self, connection, event):
         """
@@ -185,22 +164,22 @@ class Irc2OscClient(AioSimpleIRCClient):
     def parse_command(self, irc_command):
         """
         break irc_command into its parts and, if it's a valid command,
-        send it to the appropriate OSCTarget for handling
+        send it to the appropriate Command for handling
         """
         tokens = irc_command.split(' ')
         if len(tokens) == 2:
-            target, action = tokens
+            command_name, action = tokens
             value = None
         elif len(tokens) == 3:
-            target, action, value = tokens
+            command_name, action, value = tokens
         else:
             return
 
-        osc_target = self.targets.get(target.lower(), None)
+        command = self.commands.get(command_name.lower(), None)
 
-        if osc_target is not None:
+        if command is not None:
             try:
-                response = osc_target.run_action(action, value)
+                response = command.run_action(action, value)
             except InvalidActionError as error:
                 logger.error(str(error))
             else:
@@ -213,13 +192,14 @@ class Irc2OscClient(AioSimpleIRCClient):
         """
         self.irc_send(response.irc_message)
 
-        if response.has_osc_update:
-            self.osc_send(response.osc_address, response.osc_value)
+        if response.has_output:
+            for output_name, output_params in response.output_params.items():
+                self.outputs[output_name].send(response.value, **output_params)
 
-    def target_value(self, target):
+    def command_value(self, command):
         """
-        Returns the current value of a given target.  Currently, mostly a convenience
-        function for testing and debugging
+        Returns the current value of a given Command.  Currently, mostly 
+        a convenience function for testing and debugging
         """
-        target_data = self.targets.get(target, None)
-        return target_data.current if target_data is not None else None
+        command_data = self.commands.get(command, None)
+        return command_data.current if command_data is not None else None

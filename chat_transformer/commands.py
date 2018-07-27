@@ -1,5 +1,7 @@
 from .responses import ActionResponse
 
+COMMAND_TYPES = ['NUMBER', "BOOLEAN", "MESSAGE"]
+
 
 class InvalidActionError(Exception):
     """
@@ -8,7 +10,7 @@ class InvalidActionError(Exception):
     pass
 
 
-class OSCTarget:
+class Command:
     """
     Handles the current value and processing of an IRC command, which is expected to be of the form of:
 
@@ -19,52 +21,56 @@ class OSCTarget:
 
     running an action should return a CommandResponse object, which will contain a VALUE
     """
+    ALLOWED_TYPES = {
+        'increment': ['NUMBER'],
+        'decrement': ['NUMBER'],
+        'set': ['NUMBER', 'BOOLEAN'],
+        'get': ['NUMBER', 'BOOLEAN'],
+    }
+
     def __init__(
         self,
         name=None,
-        address=None,
         min=0.0,
         max=1.0,
         delta=0.05,
         initial=0.0,
         current=None,
-        allowed_actions=['increment', 'decrement', 'set'],
+        outputs={},
+        command_type=None,
     ):
         if name is None:
-            raise ValueError('name is a required keyword argument for a OSCTarget object')
+            raise ValueError(
+                'name is a required keyword argument for a Command object'
+            )
 
-        if address is None:
-            raise ValueError('address is a required keyword argument for a OSCTarget object')
+        if command_type is not None and command_type not in COMMAND_TYPES:
+            raise ValueError(
+                '{} is not a valid command type'.format(command_type)
+            )
 
         self.name = name
-        self.address = address
+        self.outputs = outputs
         self.min = min
         self.max = max
         self.delta = delta
         self.initial = initial,
         self.current = current if current is not None else initial
-        self.allowed_actions = [action.lower() for action in allowed_actions]
+        self.command_type = command_type if command_type is not None else "NUMBER"
 
     def __str__(self):
         return self.name
 
     def run_action(self, action, value=None):
         """
+        Checks action validity and the passes the action to the proper function
         """
         action = action.lower()
 
-        if action not in self.allowed_actions:
+        if self.command_type not in self.ALLOWED_TYPES.get(action, []):
             raise InvalidActionError(
-                '"{}" is not a valid action for OSCTarget "{}"'.format(action, self.name)
+                '"{}" is not a valid action for command "{}"'.format(action, self.name)
             )
-
-        if value is not None:
-            try:
-                value = float(value)
-            except ValueError:
-                return ActionResponse(
-                    self.get_invalid_value_msg(value)
-                )
 
         action_func = getattr(
             self, 'run_{}'.format(action), lambda *args, **kwargs: None
@@ -76,7 +82,7 @@ class OSCTarget:
         """
         Increase the current value by `self.delta_val`, restricting self.max
 
-        return a valid CommandResponse object
+        return a valid ActionResponse object
         """
         if self.current == self.max:
             return ActionResponse(self.max_msg)
@@ -89,7 +95,7 @@ class OSCTarget:
         return ActionResponse(
             self.max_msg,
             self.current,
-            self.address,
+            self.outputs,
         )
 
     def run_decrement(self, **kwargs):
@@ -109,13 +115,20 @@ class OSCTarget:
         return ActionResponse(
             self.min_msg,
             self.current,
-            self.address,
+            self.outputs,
         )
 
     def run_set(self, value, **kwargs):
         """
         Set the current value to the passed value, restricting to the the self.min and self.max
         """
+        try:
+            value = float(value)
+        except ValueError:
+            return ActionResponse(
+                self.get_invalid_value_msg(value)
+            )
+
         if value > self.max or value < self.min:
             return ActionResponse(self.get_out_of_bounds_msg(value))
 
@@ -126,7 +139,17 @@ class OSCTarget:
         return ActionResponse(
             response_msg,
             self.current,
-            self.address,
+            self.outputs,
+        )
+
+    def run_get(self, **kwargs):
+        """
+        Returns the current value
+        """
+        return ActionResponse(
+            response_msg,
+            self.current,
+            self.outputs,
         )
 
     @property

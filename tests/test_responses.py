@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from irc2osc.targets import ActionResponse
+from chat_transformer.responses import ActionResponse
 
 
 class ActionResponseTests(TestCase):
@@ -15,25 +15,28 @@ class ActionResponseTests(TestCase):
         )
         self.assertEqual(str(response), 'This message goes to IRC')
 
-    def test_has_osc_update(self):
+    def test_has_output(self):
         """
-        `has_osc_update` should only return True if the ActionResponse object
+        `has_output` should only return True if the ActionResponse object
         has both an `osc_value` and an `osc_address`
         """
         irc_message = 'This message goes to IRC'
 
         only_irc_response = ActionResponse(irc_message)
-        self.assertFalse(only_irc_response.has_osc_update)
+        self.assertFalse(only_irc_response.has_output)
 
-        no_address_response = ActionResponse(irc_message, osc_value=1.0)
-        self.assertFalse(no_address_response.has_osc_update)
+        no_output_response = ActionResponse(irc_message, value=1.0)
+        self.assertFalse(no_output_response.has_output)
 
-        no_value_response = ActionResponse(irc_message, osc_address='/some/address')
-        self.assertFalse(no_value_response.has_osc_update)
+        no_value_response = ActionResponse(
+            irc_message,
+            output_params={'osc': {'address': '/brightness/'}},
+        )
+        self.assertFalse(no_value_response.has_output)
 
         full_response = ActionResponse(
             'This message goes to IRC',
-            '/this/is/an/osc/address',
-            0.5
+            0.5,
+            {'osc': {'address': '/this/is/an/osc/address'}},
         )
-        self.assertTrue(full_response.has_osc_update)
+        self.assertTrue(full_response.has_output)
