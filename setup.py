@@ -19,8 +19,9 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'irc>=16.3',
+        'irc>=16.4',
         'python-osc>=1.6.6',
+        'aiohttp>=3.3.2',
     ],
     extra_requires={
         'testing': [
@@ -28,7 +29,7 @@ setup(
         ]
     },
     entry_points={'console_scripts': [
-        'chat_transformer = chat_transformer.cli:CLI.entrypoint'
+        'chat-transformer = chat_transformer.cli:CLI.entrypoint'
     ]},
     classifiers=[
         'Environment :: Web Environment',

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT_CLASSES = {
     'osc': 'chat_transformer.outputs.osc.OSCOutput',
-    # 'http': 'chat_transformer.outputs.http.HTTP',
+    'http': 'chat_transformer.outputs.http.HTTPOutput',
 }
 
 class TransformerClient(AioSimpleIRCClient):
@@ -52,9 +52,16 @@ class TransformerClient(AioSimpleIRCClient):
 
         if watch_commands_file:
             watcher = FileWatcher(
-                self.commands_file, self.load_commands, loop=self.loop, check_interval=watch_file_interval
+                self.commands_file, self.on_reload, loop=self.loop, check_interval=watch_file_interval
             )
             watcher.start()
+
+    def on_reload(self):
+        """
+        Fires when the commands file is reloaded, if `watch_commands_file` is True
+        """
+        self.load_commands()
+        self.send_all()
 
     def format_irc_channel(self, irc_channel):
         """
@@ -138,8 +145,10 @@ class TransformerClient(AioSimpleIRCClient):
             value = command.current if command.current is not None else command.initial
 
             for output_name, output in self.outputs.items():
-                output.send(
+                output.send_full(
                     value,
+                    min=command.min,
+                    max=command.max,
                     **command.outputs[output_name], 
                 )
 

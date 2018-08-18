@@ -6,7 +6,7 @@ from .udp import UDPOutput
 
 
 class OSCOutput(UDPOutput):
-    def send(self, value, address=''):
+    def send(self, value, address='', **kwargs):
         """
         send structures OSC message via UDP
         """

@@ -3,6 +3,7 @@ import sys
 import argparse
 import logging
 import asyncio
+import json
 
 from .client import TransformerClient
 
@@ -88,6 +89,7 @@ class CLI:
         irc_channel = irc.get('channel', irc_nickname)
         irc_password = irc.get('password', None)
         irc_realname = irc.get('realname', None)
+        irc_username = irc.get('username', None)
 
         # Check that required IRC arguments are received
         if not all([irc_server, irc_nickname]):
@@ -105,21 +107,20 @@ class CLI:
         outputs = get_required_key('outputs', config)
 
         client = TransformerClient(
-            irc_channel=args.irc_channel if args.irc_channel is not None else args.irc_nickname,
-            osc_ip=args.osc_ip,
-            commands_file=args.commands_file,
+            irc_channel=irc_channel if irc_channel is not None else irc_nickname,
+            commands_file=commands_file,
             watch_commands_file=watch_commands_file,
             watch_file_interval=watch_interval,
             output_data=outputs,
         )
 
         client.connect(
-            args.irc_server,
-            args.irc_port,
-            args.irc_nickname,
-            password=args.irc_password,
-            username=args.irc_username,
-            ircname=args.irc_realname,
+            irc_server,
+            irc_port,
+            irc_nickname,
+            password=irc_password,
+            username=irc_username,
+            ircname=irc_realname,
         )
 
         loop = client.reactor.loop

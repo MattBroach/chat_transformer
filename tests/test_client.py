@@ -3,23 +3,23 @@ import asyncio
 from unittest import TestCase
 from unittest.mock import patch, MagicMock, call
 
-from irc2osc.client import Irc2OscClient
+from chat_transformer.client import TransformerClient
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-class MockTarget:
+class MockCommand:
     """
-    used to inset mock OSCTarget data into `client.targets` without relying on
-    the actual OSCTarget class
+    used to inset mock OSCCommand data into `client.commands` without relying on
+    the actual OSCCommand class
     """
-    def __init__(self, address, initial, current=None):
+    def __init__(self, initial, current=None, outputs={}):
         self.initial = initial
         self.current = current
-        self.address = address
+        self.outputs = outputs
 
 
-class Irc2OscClientTests(TestCase):
+class TransformerClientTests(TestCase):
     @patch('asyncio.base_events.BaseEventLoop.create_connection')
     def setUp(self, create_connection_mock):
         self.loop = asyncio.new_event_loop()
@@ -35,8 +35,10 @@ class Irc2OscClientTests(TestCase):
         create_connection_mock.return_value = fake_connection
 
         # instantiate client
-        self.client = Irc2OscClient(
-            9876, commands_file=os.path.join(TEST_DIR, 'test_commands_file.json'), loop=self.loop
+        self.client = TransformerClient(
+            commands_file=os.path.join(TEST_DIR, 'test_commands_file.json'),
+            output_data={'osc': {'port': 6789}},
+            loop=self.loop
         )
         self.client.connect(
             'my.fake.irc.server',
@@ -45,70 +47,71 @@ class Irc2OscClientTests(TestCase):
         )
 
     def tearDown(self):
-        self.client.osc_transport.close()
+        self.client.outputs['osc'].transport.close()
 
         # Needs extra loop iteraction to actually close transport
         self.loop.run_until_complete(asyncio.sleep(0))
         self.loop.close()
 
-    @patch('irc2osc.client.Irc2OscClient.osc_send')
-    def test_command_with_no_value(self, mock_osc_send):
+    @patch('chat_transformer.outputs.osc.OSCOutput.send')
+    def test_command_with_no_value(self, mock_send):
         """
         sending `parse_command` a command with an INCREMENT/DECRMENT
         value should set the new value and send the values to
         IRC and OSC
         """
-        self.assertEqual(self.client.target_value('volume'), 0.5)
+        self.assertEqual(self.client.command_value('volume'), 0.5)
 
         self.client.parse_command('volume increment')
 
-        self.assertEqual(self.client.target_value('volume'), 0.55)
-        mock_osc_send.assert_called_with('/audio/volume', 0.55)
+        self.assertEqual(self.client.command_value('volume'), 0.55)
+        mock_send.assert_called_with(0.55, address='/audio/volume')
 
-    @patch('irc2osc.client.Irc2OscClient.osc_send')
-    def test_command_with_set_value(self, mock_osc_send):
+    @patch('chat_transformer.outputs.osc.OSCOutput.send')
+    def test_command_with_set_value(self, mock_send):
         """
         sending `parse_command` a command with a SET value should set
         to the passed value, and send the values/message to IRC and OSC
         """
-        self.assertEqual(self.client.target_value('volume'), 0.5)
+        self.assertEqual(self.client.command_value('volume'), 0.5)
 
         self.client.parse_command('volume set 0.73')
 
-        self.assertEqual(self.client.target_value('volume'), 0.73)
-        mock_osc_send.assert_called_with('/audio/volume', 0.73)
+        self.assertEqual(self.client.command_value('volume'), 0.73)
+        mock_send.assert_called_with(0.73, address='/audio/volume')
 
-    @patch('irc2osc.client.Irc2OscClient.osc_send')
-    def test_existing_target_but_fake_command_takes_no_action(self, mock_osc_send):
+    @patch('chat_transformer.outputs.osc.OSCOutput.send')
+    def test_existing_command_but_fake_command_takes_no_action(self, mock_send):
         """
-        send `parse_command` a non-existing command but a valid target
-        should silently register the InvalidAction and move on, not changing the target value
+        send `parse_command` a non-existing command but a valid command
+        should silently register the InvalidAction and move on, not changing the command value
         or sending data to OSC or IRC
         """
-        self.assertEqual(self.client.target_value('volume'), 0.5)
+        self.assertEqual(self.client.command_value('volume'), 0.5)
 
         with self.assertLogs() as cm:
             self.client.parse_command('volume foo')
 
             self.assertIn(
-                'ERROR:irc2osc.client:"foo" is not a valid action for OSCTarget "volume"', cm.output
+                ('ERROR:chat_transformer.client:"foo" is not a valid action ' 
+                 'for command "volume"'), cm.output
             )
 
-        self.assertEqual(self.client.target_value('volume'), 0.5)
-        mock_osc_send.assert_not_called()
+        self.assertEqual(self.client.command_value('volume'), 0.5)
+        mock_send.assert_not_called()
 
-    @patch('irc2osc.client.Irc2OscClient.osc_send')
-    def test_non_existing_target_produces_no_response(self, mock_osc_send):
+    @patch('chat_transformer.outputs.osc.OSCOutput.send')
+    def test_non_existing_command_produces_no_response(self, mock_send):
         """
-        send `parse_command` a non-existing target should simply have no effect,
-        neither calling/updating a target or sending data to OSC or IRC
+        send `parse_command` a non-existing command should simply have no effect,
+        neither calling/updating a command or sending data to OSC or IRC
         """
-        self.assertIsNone(self.client.target_value('foo'))
+        self.assertIsNone(self.client.command_value('foo'))
 
         self.client.parse_command('foo bar')
 
-        self.assertIsNone(self.client.target_value('foo'))
-        mock_osc_send.assert_not_called()
+        self.assertIsNone(self.client.command_value('foo'))
+        mock_send.assert_not_called()
 
     def test_format_irc_channel_ensures_hashtag_for_channel_name(self):
         """
@@ -125,26 +128,34 @@ class Irc2OscClientTests(TestCase):
         self.client.on_welcome('', '')
         self.mock_transport.write.assert_called_with(b'JOIN #fake_irc_nick\r\n')
 
-    @patch('irc2osc.client.Irc2OscClient.osc_send')
-    def test_osc_send_all(self, mock_osc_send):
+    @patch('chat_transformer.outputs.osc.OSCOutput.send')
+    def test_send_all(self, mock_send):
         """
-        `osc_send_all` should send the current or initial value for all
-        extent targets
+        `send_all` should send the current or initial value for all
+        extent commands
         """
-        client = Irc2OscClient(
-            9876, targets_file=os.path.join(TEST_DIR, 'test_target_file.json'), loop=self.loop
+        client = TransformerClient(
+            commands_file=os.path.join(TEST_DIR, 'test_commands_file.json'),
+            output_data={'osc': {'port': 6789}},
+            loop=self.loop
         )
 
-        client.targets['brightness'] = MockTarget('/osc/brightness/', 1.0)
-        client.targets['contrast'] = MockTarget('/osc/contrast/', 0.5, current=0.75)
-        client.targets['hue'] = MockTarget('/osc/hue/', 0)
+        client.commands['brightness'] = MockCommand(
+            1.0, outputs={'osc': {'address': '/osc/brightness/'}},
+        )
+        client.commands['contrast'] = MockCommand(
+            0.5, outputs={'osc': {'address': '/osc/contrast/'}}, current=0.75
+        )
+        client.commands['hue'] = MockCommand(
+            0, outputs={'osc': {'address': '/osc/hue/'}},
+        )
 
-        client.osc_send_all()
+        client.send_all()
 
         expected = [
-            call('/osc/brightness/', 1.0),
-            call('/osc/contrast/', 0.75),
-            call('/osc/hue/', 0),
+            call(1.0, address='/osc/brightness/'),
+            call(0.75, address='/osc/contrast/'),
+            call(0, address='/osc/hue/'),
         ]
 
-        mock_osc_send.assert_has_calls(expected, any_order=True)
+        mock_send.assert_has_calls(expected, any_order=True)

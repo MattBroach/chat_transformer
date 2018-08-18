@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class UDPProtocol(asyncio.DatagramProtocol):
-    def error_Received(self, exc):
+    def error_received(self, exc):
         logger.error('Protocol Error: {}'.format(exc))
 
 
@@ -31,3 +31,9 @@ class UDPOutput(BaseOutput):
         send data to target UD
         """
         self.transport.sendto(value)
+
+    def cleanup(self):
+        """
+        Close the UDP connection
+        """
+        self.transport.close()

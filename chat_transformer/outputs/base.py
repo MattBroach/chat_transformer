@@ -18,3 +18,17 @@ class BaseOutput:
         Send data to the given output.  Required for all possible outputs
         """
         raise NotImplemetedError
+
+    def send_full(self, value, **kwargs):
+        """
+        Data to send on loading/reloading commands
+        """
+        self.send(value, **kwargs)
+
+    def cleanup(self):
+        """
+        Hook for adding any necessary shutdown/connection close mechanisms
+        after closing the client
+        """
+        pass
+
