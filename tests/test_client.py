@@ -13,10 +13,12 @@ class MockCommand:
     used to inset mock OSCCommand data into `client.commands` without relying on
     the actual OSCCommand class
     """
-    def __init__(self, initial, current=None, outputs={}):
+    def __init__(self, initial, current=None, outputs={}, min=0.0, max=1.0):
         self.initial = initial
         self.current = current
         self.outputs = outputs
+        self.min = min
+        self.max = max
 
 
 class TransformerClientTests(TestCase):
@@ -93,7 +95,7 @@ class TransformerClientTests(TestCase):
             self.client.parse_command('volume foo')
 
             self.assertIn(
-                ('ERROR:chat_transformer.client:"foo" is not a valid action ' 
+                ('ERROR:chat_transformer.client:"foo" is not a valid action '
                  'for command "volume"'), cm.output
             )
 
@@ -153,9 +155,9 @@ class TransformerClientTests(TestCase):
         client.send_all()
 
         expected = [
-            call(1.0, address='/osc/brightness/'),
-            call(0.75, address='/osc/contrast/'),
-            call(0, address='/osc/hue/'),
+            call(1.0, address='/osc/brightness/', min=0.0, max=1.0),
+            call(0.75, address='/osc/contrast/', min=0.0, max=1.0),
+            call(0, address='/osc/hue/', min=0.0, max=1.0),
         ]
 
         mock_send.assert_has_calls(expected, any_order=True)

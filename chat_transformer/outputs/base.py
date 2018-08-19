@@ -17,7 +17,7 @@ class BaseOutput:
         """
         Send data to the given output.  Required for all possible outputs
         """
-        raise NotImplemetedError
+        raise NotImplementedError
 
     def send_full(self, value, **kwargs):
         """
@@ -31,4 +31,3 @@ class BaseOutput:
         after closing the client
         """
         pass
-

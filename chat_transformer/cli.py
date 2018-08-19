@@ -21,7 +21,7 @@ def get_required_key(key, config):
             '"{}" is a required key in your config file.'.format(key)
         )
 
-    
+
 class CLI:
     """
     Command-line interface for running the IRC chat-to-command transformer
@@ -132,6 +132,7 @@ class CLI:
                 client.connection.server, client.connection.port
             ))
             client.disconnect()
+            client.cleanup()
 
             tasks = asyncio.gather(
                 *asyncio.Task.all_tasks(loop=loop),

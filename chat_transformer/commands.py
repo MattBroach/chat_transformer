@@ -147,7 +147,7 @@ class Command:
         Returns the current value
         """
         return ActionResponse(
-            response_msg,
+            self.range_msg,
             self.current,
             self.outputs,
         )
@@ -165,6 +165,15 @@ class Command:
         Generates message with current value and maximum values for use in ActionResponse objects
         """
         return "{} is at {} (Max {})".format(self.name.upper(), round(self.current, 3), self.max)
+
+    @property
+    def range_msg(self):
+        """
+        Generates message with the current value and the min/max values for us in ActionResponse objects
+        """
+        return "{} is at {} (Min {}, Max {})".format(
+            self.name.upper(), round(self.current, 3), self.max, self.min
+        )
 
     def get_out_of_bounds_msg(self, value):
         """

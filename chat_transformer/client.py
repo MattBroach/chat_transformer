@@ -16,6 +16,7 @@ DEFAULT_OUTPUT_CLASSES = {
     'http': 'chat_transformer.outputs.http.HTTPOutput',
 }
 
+
 class TransformerClient(AioSimpleIRCClient):
     """
     Takes data from an IRC server, parses it, and passes the appropriate data
@@ -79,7 +80,7 @@ class TransformerClient(AioSimpleIRCClient):
 
         if self.irc_channel is None:
             self.irc_channel = self.format_irc_channel(self.irc_nickname)
-        
+
         for output in self.outputs.values():
             output.connect()
 
@@ -114,7 +115,7 @@ class TransformerClient(AioSimpleIRCClient):
                     "max": MAX_VALUE,
                     "delta": INCREMENT/DECREMENT_VALUE,
                     "initial": INITIAL_VALUE,
-                    "type": "NUMBER" (or "BOOLEAN", "MESSAGE"), 
+                    "type": "NUMBER" (or "BOOLEAN", "MESSAGE"),
                     "outputs": {
                         "osc": { "address": "/OSC/ADDRESS" },
                         "http": { "endpoint": "/HTTP/ENDPOINT" },
@@ -149,7 +150,7 @@ class TransformerClient(AioSimpleIRCClient):
                     value,
                     min=command.min,
                     max=command.max,
-                    **command.outputs[output_name], 
+                    **command.outputs[output_name],
                 )
 
     def on_privmsg(self, connection, event):
@@ -207,8 +208,12 @@ class TransformerClient(AioSimpleIRCClient):
 
     def command_value(self, command):
         """
-        Returns the current value of a given Command.  Currently, mostly 
+        Returns the current value of a given Command.  Currently, mostly
         a convenience function for testing and debugging
         """
         command_data = self.commands.get(command, None)
         return command_data.current if command_data is not None else None
+
+    def cleanup(self):
+        for output in self.outputs.values():
+            output.cleanup()
