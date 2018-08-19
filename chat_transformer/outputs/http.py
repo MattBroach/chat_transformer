@@ -63,14 +63,20 @@ class HTTPOutput(BaseOutput):
         asyncio.ensure_future(self._send(url, data))
 
     async def _send(self, url, data):
-        async with self.session.post(url, json=data, headers=self.get_headers()) as r:
-            if r.status < 200 or r.status >= 300:
-                text = await r.text()
-                logger.error(
-                    'Error posting {} value of {} to {}: {} '.format(
-                        data['name'], data['value'], url, text
-                    )
+        """
+        Posts to target. Avoids using aiohttp context manager for easier testing
+        """
+        r = await self.session.post(url, json=data, headers=self.get_headers())
+
+        if r.status < 200 or r.status >= 300:
+            text = await r.text()
+            logger.error(
+                'Error posting {} value of {} to {}: {} '.format(
+                    data['name'], data['value'], url, text
                 )
+            )
+
+        r.release()
 
     def send_full(self, value, **kwargs):
         self.send(
@@ -89,3 +95,4 @@ class HTTPOutput(BaseOutput):
 
     async def _cleanup(self):
         await self.session.close()
+        await asyncio.sleep(0)
