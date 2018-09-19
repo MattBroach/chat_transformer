@@ -17,14 +17,14 @@ class UDPOutput(BaseOutput):
         self.ip = ip
         self.loop = loop if loop is not None else asyncio.get_event_loop()
 
-    def connect(self):
+    async def connect(self):
         """
         use `asyncio` to create an OSC connection
         """
         connection = self.loop.create_datagram_endpoint(
             lambda: UDPProtocol(), remote_addr=(self.ip, self.port)
         )
-        self.transport, _ = self.loop.run_until_complete(connection)
+        self.transport, _ = await connection
 
     def send(self, value):
         """

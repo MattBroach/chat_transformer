@@ -6,7 +6,7 @@ class BaseOutput:
         """
         return cls(*args, **kwargs)
 
-    def connect(self, *args, **kwargs):
+    async def connect(self, *args, **kwargs):
         """
         Hook to connect to a given output, if necessary.  Not all outputs
         require persistent connections

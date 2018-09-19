@@ -22,6 +22,8 @@ class TransformerClient(AioSimpleIRCClient):
     Takes data from an IRC server, parses it, and passes the appropriate data
     the appropriate output(s), e.g. OSC, http, and/or back out to IRC
     """
+    reconnect_delay = 60
+
     def __init__(
         self,
         irc_channel=None,
@@ -70,7 +72,7 @@ class TransformerClient(AioSimpleIRCClient):
         """
         return irc_channel if irc_channel[0] == '#' else '#{}'.format(irc_channel)
 
-    def connect(self, irc_server, irc_port, irc_nickname, *args, **kwargs):
+    async def connect(self, irc_server, irc_port, irc_nickname, is_reconnect=False, *args, **kwargs):
         """
         Creates both IRC and OSC connections
         """
@@ -82,11 +84,14 @@ class TransformerClient(AioSimpleIRCClient):
             self.irc_channel = self.format_irc_channel(self.irc_nickname)
 
         for output in self.outputs.values():
-            output.connect()
+            await output.connect()
 
         self.send_all()
+        
+        await self.connection.connect(irc_server, irc_port, irc_nickname, *args, **kwargs)
 
-        super().connect(irc_server, irc_port, irc_nickname, *args, **kwargs)
+        if not is_reconnect:
+            self.loop.call_later(self.reconnect_delay, self.reconnect_checker)
 
     def on_welcome(self, connection, event):
         """
@@ -217,3 +222,27 @@ class TransformerClient(AioSimpleIRCClient):
     def cleanup(self):
         for output in self.outputs.values():
             output.cleanup()
+
+    def reconnect_checker(self):
+        """
+        Checks at a regular interval as to whether the connection to IRC has been
+        disconnected, and re-starts the connection if it has
+        """
+        if not self.connected and self.autoreconnect:
+            logger.info('Attempting to reconnect to {}:{}'.format(
+                self.connection.server, self.connection.port
+            ))
+            asyncio.ensure_future(
+                self.connect(
+                    self.connection.server,
+                    self.connection.port,
+                    self.connection.nickname,
+                    password=self.connection.password,
+                    username=self.connection.username,
+                    ircname=self.connection.ircname,
+                    is_reconnect=True,
+                ),
+                loop=self.loop
+            )
+
+        self.loop.call_later(self.reconnect_delay, self.reconnect_checker)

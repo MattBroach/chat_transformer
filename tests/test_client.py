@@ -22,19 +22,25 @@ class MockCommand:
 
 
 class TransformerClientTests(TestCase):
-    @patch('asyncio.base_events.BaseEventLoop.create_connection')
-    def setUp(self, create_connection_mock):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-
-        # create dummy transport, protocol
+    def create_connection_mock(self):
         fake_connection = asyncio.Future()
 
+        # create dummy transport, protocol
         self.mock_transport = MagicMock()
         self.mock_protocol = MagicMock()
 
         fake_connection.set_result((self.mock_transport, self.mock_protocol))
-        create_connection_mock.return_value = fake_connection
+
+        return fake_connection
+
+    @patch('asyncio.base_events.BaseEventLoop.create_connection')
+    @patch('asyncio.base_events.BaseEventLoop.create_datagram_endpoint')
+    def setUp(self, create_connection_mock, create_datagram_mock):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
+        create_connection_mock.return_value = self.create_connection_mock()
+        create_datagram_mock.return_value = self.create_connection_mock()
 
         # instantiate client
         self.client = TransformerClient(
@@ -42,11 +48,11 @@ class TransformerClientTests(TestCase):
             output_data={'osc': {'port': 6789}},
             loop=self.loop
         )
-        self.client.connect(
+        self.loop.run_until_complete(self.client.connect(
             'my.fake.irc.server',
             6667,
             'fake_irc_nick',
-        )
+        ))
 
     def tearDown(self):
         self.client.outputs['osc'].transport.close()

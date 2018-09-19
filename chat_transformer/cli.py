@@ -114,16 +114,16 @@ class CLI:
             output_data=outputs,
         )
 
-        client.connect(
+        loop = client.reactor.loop
+
+        loop.run_until_complete(client.connect(
             irc_server,
             irc_port,
             irc_nickname,
             password=irc_password,
             username=irc_username,
             ircname=irc_realname,
-        )
-
-        loop = client.reactor.loop
+        ))
 
         try:
             client.start()
