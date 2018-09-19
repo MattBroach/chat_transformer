@@ -87,7 +87,7 @@ class TransformerClient(AioSimpleIRCClient):
             await output.connect()
 
         self.send_all()
-        
+
         await self.connection.connect(irc_server, irc_port, irc_nickname, *args, **kwargs)
 
         if not is_reconnect:
