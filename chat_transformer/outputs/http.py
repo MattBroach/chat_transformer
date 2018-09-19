@@ -37,7 +37,7 @@ class HTTPOutput(BaseOutput):
         if self.jwt_secret:
             current = int(time.time())
             params = {'exp': current + self.jwt_token_length}
-            token = jwt.encode(params, self.jwt_secret)
+            token = jwt.encode(params, self.jwt_secret, algorithm='HS256')
             headers = {
                 **headers,
                 'Authorization': 'Bearer {}'.format(token.decode('utf-8')),
