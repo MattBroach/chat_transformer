@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/MattBroach/chat-transformer.svg?branch=master)](https://travis-ci.org/MattBroach/chat_transformer)
-[![PyPI version](https://badge.fury.io/py/chat_transformer.svg)](https://badge.fury.io/py/chat_transformer)
+[![Build Status](https://travis-ci.org/MattBroach/chat_transformer.svg?branch=master)](https://travis-ci.org/MattBroach/chat_transformer)
+[![PyPI version](https://badge.fury.io/py/chat-transformer.svg)](https://badge.fury.io/py/chat_transformer)
 
 # chat_transformer
 
