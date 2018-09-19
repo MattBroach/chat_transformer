@@ -30,13 +30,16 @@ class HTTPOutputTests(TestCase):
         secret_http = HTTPOutput(
             jwt_secret='this-is-a-fake-key-dont-use-elsewhere'
         )
-        self.assertEqual(
-            secret_http.get_headers(),
-            {'Authorization': (
+        self.assertIn(secret_http.get_headers()['Authorization'], [
+            (
                 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE1MzQ2NTkyMDh9.'
                 '29n6v-JfWa7FP65hz89nsKmhUjcWnNn-vBNNimKlrTg'
-            )}
-        )
+            ),
+            (
+                'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MzQ2NTkyMDh9.'
+                'jT3LVP6GMOPlD2kkl6JHMWigcn3hqHy2L5Lx53yb6AM'
+            ),
+        ])
         secret_http.cleanup()
 
     @patch('aiohttp.ClientSession.post')
