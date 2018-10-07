@@ -102,7 +102,7 @@ class TransformerClientTests(TestCase):
 
             self.assertIn(
                 ('ERROR:chat_transformer.client:"foo" is not a valid action '
-                 'for command "volume"'), cm.output
+                 'for command "VOLUME"'), cm.output
             )
 
         self.assertEqual(self.client.command_value('volume'), 0.5)

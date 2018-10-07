@@ -1,20 +1,35 @@
 {
   "volume": {
+    "echo": "This controls the volume",
     "min": 0.0,
     "max": 1.0,
     "initial": 0.5,
     "delta": 0.05,
+    "allowed_actions": [
+      "get",
+      "set",
+      "increment",
+      "decrement"
+    ],
     "outputs": {
       "osc": {"address": "/audio/volume"}
     }
   },
   "brightness": {
+    "echo": "This controls the brightness",
     "min": -100,
     "max": 100,
     "initial": 0,
     "delta": 1,
+    "allowed_actions": [
+      "get",
+      "set"
+    ],
     "outputs": {
       "osc": {"address": "/video/bc/brightness"}
     }
+  },
+  "!commands": {
+    "echo": "This is not a list of commands"
   }
 }

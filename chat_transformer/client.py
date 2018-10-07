@@ -151,12 +151,17 @@ class TransformerClient(AioSimpleIRCClient):
             value = command.current if command.current is not None else command.initial
 
             for output_name, output in self.outputs.items():
-                output.send_full(
-                    value,
-                    min=command.min,
-                    max=command.max,
-                    **command.outputs[output_name],
-                )
+                try:
+                    output.send_full(
+                        value,
+                        min=command.min,
+                        max=command.max,
+                        **command.outputs[output_name],
+                    )
+                except KeyError:
+                    logger.debug(
+                        'Command "{}" has not output "{}"'.format(command, output_name)
+                    )
 
     def on_privmsg(self, connection, event):
         """
@@ -176,18 +181,32 @@ class TransformerClient(AioSimpleIRCClient):
         """
         self.parse_command(event.arguments[0])
 
+    def _split_command(self, irc_command):
+        """
+        Breaks the incoming message into the relevant parts, for fetching
+        """
+        action = None
+        value = None
+        command_name = None
+
+        tokens = irc_command.split(' ')
+        if len(tokens) == 1:
+            command_name = tokens[0]
+        if len(tokens) == 2:
+            command_name, action = tokens
+        elif len(tokens) == 3:
+            command_name, action, value = tokens
+
+        return command_name, action, value
+
     def parse_command(self, irc_command):
         """
         break irc_command into its parts and, if it's a valid command,
         send it to the appropriate Command for handling
         """
-        tokens = irc_command.split(' ')
-        if len(tokens) == 2:
-            command_name, action = tokens
-            value = None
-        elif len(tokens) == 3:
-            command_name, action, value = tokens
-        else:
+        command_name, action, value = self._split_command(irc_command)
+
+        if command_name is None:
             return
 
         command = self.commands.get(command_name.lower(), None)
@@ -228,7 +247,7 @@ class TransformerClient(AioSimpleIRCClient):
         Checks at a regular interval as to whether the connection to IRC has been
         disconnected, and re-starts the connection if it has
         """
-        if not self.connected and self.autoreconnect:
+        if not getattr(self.connection, 'connected', False) and self.autoreconnect:
             logger.info('Attempting to reconnect to {}:{}'.format(
                 self.connection.server, self.connection.port
             ))

@@ -1,7 +1,5 @@
 from .responses import ActionResponse
 
-COMMAND_TYPES = ['NUMBER', "BOOLEAN", "MESSAGE"]
-
 
 class InvalidActionError(Exception):
     """
@@ -21,13 +19,6 @@ class Command:
 
     running an action should return a CommandResponse object, which will contain a VALUE
     """
-    ALLOWED_TYPES = {
-        'increment': ['NUMBER'],
-        'decrement': ['NUMBER'],
-        'set': ['NUMBER', 'BOOLEAN'],
-        'get': ['NUMBER', 'BOOLEAN'],
-    }
-
     def __init__(
         self,
         name=None,
@@ -37,16 +28,12 @@ class Command:
         initial=0.0,
         current=None,
         outputs={},
-        command_type=None,
+        echo='',
+        allowed_actions=[],
     ):
         if name is None:
             raise ValueError(
                 'name is a required keyword argument for a Command object'
-            )
-
-        if command_type is not None and command_type not in COMMAND_TYPES:
-            raise ValueError(
-                '{} is not a valid command type'.format(command_type)
             )
 
         self.name = name
@@ -56,20 +43,24 @@ class Command:
         self.delta = delta
         self.initial = initial,
         self.current = current if current is not None else initial
-        self.command_type = command_type if command_type is not None else "NUMBER"
+        self.echo = echo
+        self.allowed_actions = allowed_actions
 
     def __str__(self):
         return self.name
 
-    def run_action(self, action, value=None):
+    def run_action(self, action=None, value=None):
         """
         Checks action validity and the passes the action to the proper function
         """
+        if action is None:
+            return ActionResponse(self.echo)
+
         action = action.lower()
 
-        if self.command_type not in self.ALLOWED_TYPES.get(action, []):
+        if action not in self.allowed_actions:
             raise InvalidActionError(
-                '"{}" is not a valid action for command "{}"'.format(action, self.name)
+                '"{}" is not a valid action for command "{}"'.format(action, self.name.upper())
             )
 
         action_func = getattr(
@@ -124,10 +115,8 @@ class Command:
         """
         try:
             value = float(value)
-        except ValueError:
-            return ActionResponse(
-                self.get_invalid_value_msg(value)
-            )
+        except (ValueError, TypeError) as e:
+            return ActionResponse(self.invalid_value_msg)
 
         if value > self.max or value < self.min:
             return ActionResponse(self.get_out_of_bounds_msg(value))
@@ -175,19 +164,20 @@ class Command:
             self.name.upper(), round(self.current, 3), self.max, self.min
         )
 
+    @property
+    def invalid_value_msg(self):
+        """
+        Generates message stating value passed is not a valid value (usually because a float
+        was expected but not received)
+        """
+        return '"{} set" requires a number value between {} and {}'.format(
+            self.name.upper(), self.min, self.max
+        )
+
     def get_out_of_bounds_msg(self, value):
         """
         Generates message stating value passed is out of bounds, and requesting a proper value
         """
         return "{} is out of bounds for {} (Min {}, Max {})".format(
            value, self.name.upper(), self.min, self.max
-        )
-
-    def get_invalid_value_msg(self, value):
-        """
-        Generates message stating value passed is not a valid value (usually because a float
-        was expected but not received)
-        """
-        return "{} is not a valid value for {}".format(
-            value, self.name.upper()
         )
