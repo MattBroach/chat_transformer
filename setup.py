@@ -22,7 +22,7 @@ setup(
         'irc>=16.4',
         'python-osc>=1.6.6',
         'aiohttp>=3.3.2',
-        'PyJWT==1.6.4',
+        'PyJWT==2.4.0',
     ],
     extra_requires={
         'testing': [
